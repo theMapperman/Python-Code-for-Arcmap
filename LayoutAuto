@@ -1,0 +1,232 @@
+#Written by Steve Atchison for Shawnee County 01/13/2015
+#A set of scripts to automate map making and editing.
+import os
+import webbrowser
+
+mxd = arcpy.mapping.MapDocument('CURRENT')
+
+df = arcpy.mapping.ListDataFrames(mxd)[0]
+def uk(known,acres):
+    '''
+    Written by Steve Atchison for Shawnee County.
+    This functon prints the unknown side
+    when known side and acers are entered.
+    example:  uk(1320,20)
+    '''
+    acres_to_sf = float(acres* 43560)
+    unknownside = float(acres_to_sf / known)
+    print('Acres =  %.2f' %acres)
+    print('Known Side = %2.f' %known)
+    print('Unknown Side = %.2f ft' %unknownside)
+   
+def editset(): #I use this for editing.
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Point')[0]
+    lyr.visible=True
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Poly')[0]
+    lyr.visible=True
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Photos_2014')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Owners')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'SCRATCH_PAD_2016')[0]
+    lyr.visible=True
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Sub_Poly')[0]
+    lyr.visible=True
+    
+    mxd.activeView = df #df is the name of the data frame as defined at the top.
+    refresh()   
+
+def parcelzoom():
+    df.zoomToSelectedFeatures()
+
+def refresh():
+    arcpy.RefreshActiveView()
+    arcpy.RefreshTOC()
+
+def photoon():
+    print('Saving the map with the photo.')
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Point')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Poly')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Photos_2014')[0]
+    lyr.visible=True
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Owners')[0]
+    lyr.visible=True
+    
+    exportpdf()
+
+def deeds():
+    lyr=arcpy.mapping.ListLayers(mxd,'psections')[0]
+    lyr.visible=True
+    
+    lyr=arcpy.mapping.ListLayers(mxd,'Sub_poly')[0]
+    lyr.visible=True
+    
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Point')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Poly')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Photos_2014')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Owners')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'SCRATCH_PAD_2016')[0]
+    lyr.visible=True
+
+    mxd.activeView = df #df is the name of the data frame.
+    
+    refresh()
+ 
+def layer_control():
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Point')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Poly')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Photos_2014')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Owners')[0]
+    lyr.visible=True
+
+    lyr=arcpy.mapping.ListLayers(mxd,'SCRATCH_PAD_2016')[0]
+    lyr.visible=False
+    
+def labelchange():
+
+    for row in arcpy.SearchCursor("Owners"):        
+        owner=row.getValue("ONAME")
+        pin_num=row.getValue("PIN")
+        prop_address=row.getValue("PADDRESS")
+        #deednum=row.getValue("DBOOKPAGE")
+        acres=row.getValue("ACRES")
+        thedata=("""
+        Owner: %s
+        Parcel number: %s
+        Property address: %s
+        #Deed number: %s
+        Acres = %.2f """)%(owner,pin_num, prop_address,acres)
+        print(thedata)
+
+    for elm in arcpy.mapping.ListLayoutElements(mxd, "TEXT_ELEMENT"):
+        if elm.name == "parceldata":
+            elm.text = str(thedata)    
+    parcelzoom()
+    layout('200')        
+
+def owners():
+    deeds()
+    lyr=arcpy.mapping.ListLayers(mxd,'Owners')[0]
+    lyr.visible=True
+        
+def layout(scale):
+    if scale == str(50): 
+        mxd.activeView = 'Page_Layout'
+        df.scale = 600
+        df.referenceScale = '600'
+    
+    if scale == str(200): 
+        mxd.activeView = 'Page_Layout'
+        df.scale = 2400
+        df.referenceScale = '1200'
+  
+    elif scale == str(100):
+        mxd.activeView = 'Page_Layout'
+        df.scale = 1200
+        df.referenceScale = '600'       
+    
+    elif scale == str(400):
+        mxd.activeView = 'Page_Layout'
+        df.scale = 4800
+        df.referenceScale = '2400'      
+    layer_control()
+    refresh()
+
+def exportpdf():
+    print('Creating a PDF file. Saved on the desktop with the name TaxpayerMap.pdf')
+
+    arcpy.mapping.ExportToPDF(mxd, "TaxpayerMap.pdf")
+    os.system(r'\\nagen8\Appraiser\atchiss\Desktop\TaxpayerMap.pdf')
+
+    layer_control()
+
+def polyoff(): #Turn off all polygons, I use this when editing text.
+    lyr=arcpy.mapping.ListLayers(mxd,'psections')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Parcel_Poly')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Owners')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Sub_Poly')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'govlot3')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'City Limits')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'reserves')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'Townships')[0]
+    lyr.visible=False
+
+    lyr=arcpy.mapping.ListLayers(mxd,'taxunit')[0]
+    lyr.visible=False
+
+    refresh()
+
+def theweb():
+    for row in arcpy.SearchCursor("Owners"):
+        parcelnumber= row.PID
+        print(parcelnumber)
+        
+        webbrowser.open('http://www.snco.us/Ap/R_prop/Listing.asp?PRCL_ID='+str(parcelnumber))
+        open
+     
+def helpme():
+    print('''
+             FUNCTION LIST
+             
+             Use layout('50') to create a 50 scale map.
+             Use layout('100') to create a 100 scale map.
+             Use layout('200') to create a 200 scale map.
+             Use layout('400') to create a 400 scale map.
+
+             owners() will turn on the owner layer.
+
+             polyoff() will turn off all polygon layers.
+
+             photoon() will export a PDF map with the photo named TaxpayerMap.pdf on your desktop.
+
+             exportpdf() will export a PDF map without the photo named TaxpayerMap.pdf on your desktop.
+
+             labelchange() SELECT A PARCEL FROM THE OWNER LAYER FIRST before using this!
+
+             Use editset() to re-set the layers for editing.
+             
+             Use deeds() for working deeds.
+
+             theweb() will open appraiser website.
+
+             uk() will find the unknown side.''')
+helpme()   
